@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14281d"><link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png"><title>AlgoForja</title>
+<style>
+:root{--bg:#14281d;--card:#1d3a2a;--ink:#eaf6ee;--mut:#9cc0aa;--ac:#7be0a4;--warn:#ffd479}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{max-width:640px;margin:auto;padding:14px}
+h1,h2,h3{margin:.3em 0}
+.card{background:var(--card);border-radius:16px;padding:14px;margin:10px 0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pill{background:#0003;border-radius:99px;padding:4px 10px;font-size:14px}
+button{font:inherit;color:inherit;background:#2c553d;border:0;border-radius:12px;padding:10px 14px;cursor:pointer}
+button.p{background:var(--ac);color:#06210f;font-weight:700;margin-top:8px}
+button:disabled{opacity:.4}
+.opt{display:block;width:100%;text-align:left;margin:6px 0}
+.code{font:13px ui-monospace,monospace;white-space:pre;overflow-x:auto}
+.ok{background:#2f7a4d!important}.no{background:#8a3a3a!important}
+pre{background:#0b1a12;border-radius:10px;padding:10px;overflow:auto;max-height:45vh;font:13px/1.5 ui-monospace,monospace;margin:8px 0}
+.ln{display:block;cursor:pointer;border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:14px}td,th{border:1px solid #fff2;padding:5px;text-align:center}
+.bar{height:8px;background:#0004;border-radius:9px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:var(--ac)}
+.chip{display:inline-block;margin:4px;padding:7px 11px;background:#2c553d;border-radius:10px;font:14px ui-monospace,monospace;cursor:pointer}
+.blank{display:inline-block;min-width:60px;border-bottom:2px dashed var(--ac);padding:0 6px;color:var(--warn);cursor:pointer;text-align:center}
+.node{display:flex;gap:10px;align-items:center;width:100%;margin:6px 0}
+textarea,input{width:100%;background:#0b1a12;color:var(--ink);border:1px solid #fff3;border-radius:10px;padding:10px;font:13px ui-monospace,monospace;margin:6px 0}
+textarea{height:240px}
+.mut{color:var(--mut)}
+</style></head><body><div id="app"></div>
+<script>
+const $=s=>document.querySelector(s),A=$('#app');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const shuf=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(x=>x[1]);
+const pick1=a=>a[Math.floor(Math.random()*a.length)];
+const KW=new Set('def for while if elif else return break continue in not and or is None True False range len print import from class pass lambda with as try except self append get put add pop empty min max sum abs int float str list dict set tuple PriorityQueue Queue heappush heappop'.split(' '));
+const TOK=/[A-Za-z_]\w*|\d+\.?\d*|==|!=|<=|>=|[<>]/g;
+const RANGOS=[[0,'Aprendiz'],[100,'Mecánico'],[300,'Ingeniero inverso'],[600,'Arquitecto']];
+const MODES=[['rx','🩻','Radiografía','Pasos 1-5: ¿qué papel tiene cada parte?'],['hu','🧩','Huecos','Niveles 2-3: completa lo que falta'],['or','🔀','Ordenar','Paso 5: reordena un bloque'],['tr','🗣️','Traductor','Paso 7: de palabras a código'],['bg','🐞','Caza-errores','Nivel 4: halla la línea alterada'],['ci','🧠','A ciegas','Paso 8: reconstruye con solo el esqueleto']];
+const EJ=`def buscar(lista, buscado):\n    posicion = -1\n    for i in range(len(lista)):\n        if lista[i] == buscado:\n            posicion = i\n            break\n    return posicion`;
+
+// ---- análisis del código (reglas propias) ----
+function parse(code){return code.replace(/\t/g,'    ').split('\n').map(l=>l.replace(/\s+$/,'')).filter(l=>l.trim()&&!/^\s*(#|\/\/)/.test(l)).map(t=>{const s=t.trim();
+ const k=/^def\s/.test(s)?'def':/^(for|while)\b/.test(s)?'loop':/^(if|elif|else)\b/.test(s)?'cond':/^return\b/.test(s)?'ret':/^(break|continue)\b/.test(s)?'jump':/^[\w.\[\], ()]+?\s*[-+*\/]?=(?!=)/.test(s)?'asg':'seq';
+ return{t,s,k}})}
+function info(L){const d=L.find(l=>l.k=='def'),m=d&&d.s.match(/^def\s+(\w+)\s*\((.*?)\)/);
+ const par=m?m[2].split(',').map(x=>x.trim().replace(/[:=].*$/,'').trim()).filter(Boolean):[],vs=new Set(),rets=new Set();
+ L.forEach(l=>{let x;if(l.k=='asg'&&(x=l.s.match(/^([A-Za-z_]\w*)/)))vs.add(x[1]);if(x=l.s.match(/^for\s+(\w+)/))vs.add(x[1]);
+  if(l.k=='ret')(l.s.match(/[A-Za-z_]\w*/g)||[]).forEach(w=>{if(!KW.has(w))rets.add(w)})});
+ return{name:m?m[1]:'(sin función)',par,vars:[...new Set([...par,...vs])],role:v=>par.includes(v)?0:rets.has(v)?2:1}}
+const say=s=>{let m;
+ if(m=s.match(/^def\s+(\w+)\s*\((.*?)\)/))return`Defino la función ${m[1]}, que recibe ${m[2]||'nada'}`;
+ if(m=s.match(/^for\s+(.+?)\s+in\s+(.+?):?$/))return`Repito para cada ${m[1]} en ${m[2]}`;
+ if(m=s.match(/^while\s+(.+?):?$/))return`Mientras ${m[1]}, repito`;
+ if(m=s.match(/^elif\s+(.+?):?$/))return`Si no, y si ${m[1]}`;
+ if(m=s.match(/^if\s+(.+?):?$/))return`Si ${m[1]}`;
+ if(/^else/.test(s))return'En cualquier otro caso';
+ if(m=s.match(/^return\s*(.*)$/))return m[1]?`Devuelvo ${m[1]}`:'Termino la función';
+ if(s=='break')return'Termino el ciclo';if(s=='continue')return'Salto a la siguiente vuelta';
+ if(m=s.match(/^(.+?)\s*([-+*\/]?)=\s*(.+)$/))return m[2]=='+'?`Sumo ${m[3]} a ${m[1]}`:m[2]=='-'?`Resto ${m[3]} a ${m[1]}`:m[2]?`Actualizo ${m[1]} con ${m[2]}= ${m[3]}`:`Guardo ${m[3]} en ${m[1]}`;
+ return`Ejecuto ${s}`};
+const SN=['Secuencia','Condición','Repetición','Retorno / salto'],SK={asg:0,seq:0,def:0,cond:1,loop:2,ret:3,jump:3};
+const SW=['Se ejecuta en orden: ni decide ni repite.','Decide qué camino seguir según una condición.','Repite instrucciones durante un recorrido o mientras se cumpla una regla.','Entrega un resultado o altera el ciclo.'];
+const ROLES=['Entrada (dato que recibe)','Variable interna (guarda estado)','Salida (lo que devuelve)'],RW=['Llega como parámetro.','Se crea y cambia dentro del algoritmo.','Es lo que se devuelve al final.'];
+const MUT=[[/==/,'!='],[/!=/,'=='],[/<=/,'<'],[/>=/,'>'],[/ < /,' > '],[/ > /,' < '],[/ \+ /,' - '],[/ - /,' + '],[/\band\b/,'or'],[/\bor\b/,'and'],[/\b\d+\b/,m=>String(+m+1)]];
+
+// ---- generadores de retos ----
+const GEN={
+rx(L){const I=info(L),B=shuf(L.filter(l=>l.k!='def')).slice(0,3).map(l=>({t:'quiz',q:'¿Qué estructura de control es esta línea?',code:l.t,o:SN,a:SK[l.k],w:SW[SK[l.k]]}));
+ return B.concat(shuf(I.vars).slice(0,2).map(v=>({t:'quiz',q:`¿Qué papel tiene «${v}» en este algoritmo?`,code:L.map(l=>l.t).join('\n'),o:ROLES,a:I.role(v),w:RW[I.role(v)]})))},
+hu(L){const C=[];L.forEach((l,i)=>{if(l.k!='def')for(const m of l.t.matchAll(TOK))if(!KW.has(m[0]))C.push([i,m[0]])});
+ const mk=n=>{const by=shuf([...new Set(C.map(c=>c[0]))]).slice(0,n).sort((a,b)=>a-b);if(!by.length)return 0;
+  const rows=L.map(l=>l.t),ans=by.map(i=>{const m=pick1([...L[i].t.matchAll(TOK)].filter(m=>!KW.has(m[0])));rows[i]=rows[i].slice(0,m.index)+'___'+rows[i].slice(m.index+m[0].length);return m[0]});
+  const d=shuf([...new Set(C.map(c=>c[1]))].filter(x=>!ans.includes(x))).slice(0,3);
+  return{t:'fill',q:`Completa ${by.length} hueco${by.length>1?'s':''}`,code:rows.join('\n'),bank:shuf(ans.concat(d)),ans,w:'Fíjate en qué variables existen ya antes de esa línea.'}};
+ return[mk(1),mk(2),mk(4)].filter(Boolean)},
+or(L){const mk=n=>{n=Math.min(n,L.length);if(n<3)return 0;const s=Math.floor(Math.random()*(L.length-n+1));return{t:'order',q:'Ordena este bloque del algoritmo',items:L.slice(s,s+n).map(l=>l.t),w:'La indentación te dice qué va dentro de qué.'}};return[mk(4),mk(7)].filter(Boolean)},
+tr(L){const B=L.filter(l=>l.k!='def'),U=[...new Set(B.map(l=>l.s))];if(U.length<2)return[];
+ return shuf(B).slice(0,5).map(l=>{const o=shuf([l.s,...shuf(U.filter(x=>x!=l.s)).slice(0,3)]);return{t:'quiz',m:1,q:`«${say(l.s)}». ¿Qué línea es?`,o,a:o.indexOf(l.s),w:'Traducir de palabras a código es reconstruir sin memorizar.'}})},
+bg(L){const mk=()=>{const c=[];L.forEach((l,i)=>{if(l.k!='def')MUT.forEach(([re,r])=>{const n=l.t.replace(re,r);if(n!=l.t)c.push([i,n])})});
+  if(!c.length)return 0;const[i,n]=pick1(c),rows=L.map(l=>l.t);rows[i]=n;return{t:'pick',q:'Alguien alteró UNA línea. ¿Cuál es?',lines:rows,a:i,w:`Antes decía: ${L[i].t.trim()}`}};
+ return[mk(),mk(),mk()].filter(Boolean)},
+ci(L){return[{t:'blind',q:'Reconstruye el código desde el esqueleto',ref:L.map(l=>l.t),sk:L.map(l=>l.t.slice(0,l.t.length-l.s.length)+(l.k=='asg'?l.s.match(/^[^=+\-*\/ ]+/)[0]+' …':l.s.split(/[\s(:]/)[0]+' …')).join('\n')}]}};
+
+// ---- estado (IndexedDB) ----
+let S={xp:0,streak:0,last:'',algs:[]},R,hearts,mist,VV=[];
+const db=new Promise(r=>{try{const q=indexedDB.open('algoforja',1);q.onupgradeneeded=()=>q.result.createObjectStore('k');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)}catch(e){r(null)}});
+const load=async()=>{const d=await db;return d?new Promise(r=>{const g=d.transaction('k').objectStore('k').get('s');g.onsuccess=()=>r(g.result);g.onerror=()=>r()}):0};
+const save=async()=>{const d=await db;if(d)d.transaction('k','readwrite').objectStore('k').put(S,'s')};
+const alg=id=>S.algs.find(a=>a.id==id);
+
+// ---- pantallas ----
+function home(){const c=[...RANGOS].reverse().find(r=>S.xp>=r[0]),nx=RANGOS.find(r=>r[0]>S.xp);
+ A.innerHTML=`<div class=top><h1>⚙️ AlgoForja</h1><span class=pill>🔥 ${S.streak}</span></div>
+ <div class=card><b>${c[1]}</b> · ${S.xp} XP<div class=bar><i style="width:${nx?(S.xp-c[0])/(nx[0]-c[0])*100:100}%"></i></div></div>`
+ +(S.algs.length?S.algs.map(a=>{const t=MODES.reduce((s,m)=>s+(a.st[m[0]]||0),0);return `<button class="card node" onclick="algo(${a.id})"><span style="flex:1;text-align:left"><b>${esc(a.n)}</b><div class=bar><i style="width:${t/(MODES.length*3)*100}%"></i></div></span><span>${t}/${MODES.length*3} ⭐</span></button>`}).join(''):'<p class=mut>Pega el código de un algoritmo y la app lo convierte en juego.</p>')
+ +`<button class=p onclick=form(0)>➕ Nuevo algoritmo</button>`}
+function form(id){const a=id?alg(id):{n:'',code:''};
+ A.innerHTML=`<button onclick="${id?`algo(${id})`:'home()'}">← Volver</button><h2>${id?'✏️ Editar':'➕ Nuevo'} algoritmo</h2><input id=nm placeholder="Nombre (ej. Búsqueda binaria)" value="${esc(a.n)}"><textarea id=cd placeholder="Pega aquí tu código (Python funciona mejor)">${esc(a.code)}</textarea><button onclick=ex()>💡 Probar con un ejemplo</button> <button class=p onclick="sv(${id})">Guardar</button><p id=er class=mut></p>`}
+function ex(){$('#nm').value='Búsqueda lineal';$('#cd').value=EJ}
+function sv(id){const n=$('#nm').value.trim(),c=$('#cd').value;if(!n||parse(c).length<3)return $('#er').textContent='Pon un nombre y al menos 3 líneas de código.';
+ if(id){const a=alg(id);if(a.code!=c)a.st={};a.n=n;a.code=c}else{id=Date.now();S.algs.push({id,n,code:c,st:{}})}save();algo(id)}
+function del(id){if(confirm('¿Borrar este algoritmo?')){S.algs=S.algs.filter(a=>a.id!=id);save();home()}}
+function algo(id){const a=alg(id),L=parse(a.code),I=info(L),n=k=>L.filter(l=>l.k==k).length;
+ A.innerHTML=`<button onclick=home()>← Volver</button> <button onclick="form(${id})">✏️</button> <button onclick="del(${id})">🗑️</button><h2>${esc(a.n)}</h2>
+ <div class="card mut"><small>${L.length} líneas · función ${esc(I.name)}</small><br>Entradas: ${esc(I.par.join(', ')||'—')}<br>Variables: ${esc(I.vars.join(', ')||'—')}<br>Estructuras: ${n('loop')} ciclo(s) · ${n('cond')} condición(es) · ${n('ret')} retorno(s)</div>`
+ +MODES.map(m=>`<button class=node onclick="start(${id},'${m[0]}')"><span style="font-size:24px">${m[1]}</span><span style="flex:1;text-align:left"><b>${m[2]}</b><br><small class=mut>${m[3]}</small></span><span>${'⭐'.repeat(a.st[m[0]]||0)||'▶️'}</span></button>`).join('')
+ +`<button class=node onclick="sim(${id})"><span style="font-size:24px">🧮</span><span style="flex:1;text-align:left"><b>Simulación manual</b><br><small class=mut>Paso 6: tabla de seguimiento</small></span></button>`}
+function sim(id){VV=info(parse(alg(id).code)).vars.slice(0,7);
+ A.innerHTML=`<button onclick="algo(${id})">← Volver</button><h2>🧮 Simulación manual</h2><p class=mut>Elige datos pequeños y anota cómo cambia cada variable. Por cada línea pregúntate: ¿qué valor tiene antes? ¿y después? ¿qué se perdería si no se ejecutara?</p><div style="overflow-x:auto"><table id=tb><tr><th>#</th>${VV.map(v=>`<th>${esc(v)}</th>`).join('')}</tr></table></div><button onclick=addRow()>+ fila</button>`;addRow();addRow()}
+function addRow(){const t=$('#tb'),r=t.insertRow();r.innerHTML=`<td>${t.rows.length-1}</td>`+VV.map(()=>'<td contenteditable style="min-width:48px"></td>').join('')}
+
+// ---- juego ----
+function start(id,mode){const ch=GEN[mode](parse(alg(id).code));if(!ch.length)return alert('Este código no da para este modo (muy corto o le faltan elementos).');R={id,mode,ch,i:0};hearts=3;mist=0;draw()}
+function draw(){const s=R.ch[R.i],md=MODES.find(m=>m[0]==R.mode);
+ let h=`<div class=top><button onclick="algo(${R.id})">✕</button><small>${md[1]} ${md[2]} · ${R.i+1}/${R.ch.length}</small><span id=hp>${'❤️'.repeat(hearts)}</span></div><div class=card><h3>${esc(s.q)}</h3>`;
+ if(s.code&&s.t=='quiz')h+=`<pre>${esc(s.code)}</pre>`;
+ A.innerHTML=h+'<div id=z></div><div id=fb></div></div>';T[s.t](s)}
+function miss(){mist++;hearts--;$('#hp').textContent='❤️'.repeat(Math.max(hearts,0))||'💔';
+ if(hearts<=0){$('#z').style.pointerEvents='none';$('#fb').innerHTML=`<p>💔 Te quedaste sin vidas. Repasa la lógica y prueba otra ronda.</p><button class=p onclick="start(R.id,R.mode)">Reintentar</button>`;return 1}}
+function nx(){R.i++;draw()}
+function win(w){$('#z').style.pointerEvents='none';const l=R.i==R.ch.length-1;
+ $('#fb').innerHTML=`<p>✅ ${esc(w||'¡Bien!')}</p><button class=p onclick="${l?'fin()':'nx()'}">${l?'Terminar ✓':'Continuar →'}</button>`}
+function fin(){const st=mist==0?3:mist<=2?2:1,a=alg(R.id),pv=a.st[R.mode]||0;if(st>pv){S.xp+=10*(st-pv);a.st[R.mode]=st}
+ const t=new Date().toDateString(),y=new Date(Date.now()-864e5).toDateString();if(S.last!=t){S.streak=S.last==y?S.streak+1:1;S.last=t}
+ save();A.innerHTML=`<div class=card style="text-align:center"><h2>${'⭐'.repeat(st)}</h2><p>${mist?mist+' fallo(s)':'¡Sin fallos!'} · ${S.xp} XP</p><button class=p onclick="start(R.id,R.mode)">🔁 Otra ronda</button> <button onclick="algo(R.id)">Volver</button></div>`}
+const bind=s=>document.querySelectorAll('#z [data-i]').forEach(b=>b.onclick=()=>{
+ if(+b.dataset.i==s.a){b.classList.add('ok');win(s.w)}else{b.classList.add('no');b.style.pointerEvents='none';miss()}});
+const T={
+quiz(s){$('#z').innerHTML=shuf(s.o.map((t,i)=>[t,i])).map(([t,i])=>`<button class="opt ${s.m?'code':''}" data-i=${i}>${esc(t)}</button>`).join('');bind(s)},
+pick(s){$('#z').innerHTML='<pre>'+s.lines.map((l,i)=>`<span class=ln data-i=${i}>${esc(l)||' '}</span>`).join('')+'</pre>';bind(s)},
+order(s){let pool=shuf(s.items.map((t,i)=>[t,i])),ch=[];
+ const r=()=>{$('#z').innerHTML=ch.map(([t],j)=>`<button class="opt code ok" data-c=${j}>${esc(t)}</button>`).join('')+'<hr style="opacity:.2">'+pool.map(([t],j)=>`<button class="opt code" data-p=${j}>${esc(t)}</button>`).join('')+`<button class=p id=chk ${pool.length?'disabled':''}>Comprobar</button>`;
+  document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ch.push(pool.splice(+b.dataset.p,1)[0]);r()});
+  document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{pool.push(ch.splice(+b.dataset.c,1)[0]);r()});
+  $('#chk').onclick=()=>{if(ch.every(([t],j)=>t==s.items[j]))win(s.w);else if(!miss()){pool=shuf(ch.splice(0));r()}}};r()},
+fill(s){const P=s.code.split('___');let v=P.slice(1).map(()=>-1);
+ const r=()=>{$('#z').innerHTML='<pre>'+P.map((p,j)=>esc(p)+(j<v.length?`<span class=blank data-b=${j}>${v[j]<0?'&nbsp;&nbsp;&nbsp;':esc(s.bank[v[j]])}</span>`:'')).join('')+'</pre>'
+  +s.bank.map((t,i)=>`<span class=chip data-k=${i} style="${v.includes(i)?'opacity:.3;pointer-events:none':''}">${esc(t)}</span>`).join('')+'<br><button class=p id=chk>Comprobar</button>';
+  document.querySelectorAll('[data-k]').forEach(c=>c.onclick=()=>{const j=v.indexOf(-1);if(j>=0){v[j]=+c.dataset.k;r()}});
+  document.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{v[+b.dataset.b]=-1;r()});
+  $('#chk').onclick=()=>{const bad=v.map((x,j)=>x<0||s.bank[x]!==s.ans[j]);
+   if(!bad.some(Boolean))win(s.w);else if(!miss()){v=v.map((x,j)=>bad[j]?-1:x);r()}}};r()},
+blind(s){$('#z').innerHTML=`<pre>${esc(s.sk)}</pre><textarea id=tx placeholder="Escribe el código completo, sin mirar"></textarea><button class=p id=chk>Comprobar</button><p id=hn class=mut></p>`;
+ $('#chk').onclick=()=>{const n=x=>x.replace(/\s+/g,''),u=$('#tx').value.split('\n').map(n).filter(Boolean),fal=[];
+  s.ref.forEach(r=>{const j=u.indexOf(n(r));if(j<0)fal.push(r);else u.splice(j,1)});const ok=s.ref.length-fal.length;
+  if(ok/s.ref.length>=.85)win(`${ok}/${s.ref.length} líneas correctas.`+(fal.length?` Faltó: ${fal.map(x=>x.trim()).join(' | ')}`:''));
+  else if(!miss())$('#hn').textContent=`Vas ${ok}/${s.ref.length}. Pista: te falta una línea que empieza por «${fal[0].trim().slice(0,8)}…»`}}};
+
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+load().then(s=>{if(s)S=Object.assign(S,s);home()});
+</script></body></html>
