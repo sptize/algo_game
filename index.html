@@ -95,15 +95,15 @@ function home(){const c=[...RANGOS].reverse().find(r=>S.xp>=r[0]),nx=RANGOS.find
  A.innerHTML=`<div class=top><h1>⚙️ AlgoForja</h1><span class=pill>🔥 ${S.streak}</span></div>
  <div class=card><b>${c[1]}</b> · ${S.xp} XP<div class=bar><i style="width:${nx?(S.xp-c[0])/(nx[0]-c[0])*100:100}%"></i></div></div>`
  +(S.algs.length?S.algs.map(a=>{const t=MODES.reduce((s,m)=>s+(a.st[m[0]]||0),0);return `<button class="card node" onclick="algo(${a.id})"><span style="flex:1;text-align:left"><b>${esc(a.n)}</b><div class=bar><i style="width:${t/(MODES.length*3)*100}%"></i></div></span><span>${t}/${MODES.length*3} ⭐</span></button>`}).join(''):'<p class=mut>Pega el código de un algoritmo y la app lo convierte en juego.</p>')
- +`<button class=p onclick=form(0)>➕ Nuevo algoritmo</button>`}
-function form(id){const a=id?alg(id):{n:'',code:''};
+ +`<button class=p onclick=frm(0)>➕ Nuevo algoritmo</button>`}
+function frm(id){const a=id?alg(id):{n:'',code:''};
  A.innerHTML=`<button onclick="${id?`algo(${id})`:'home()'}">← Volver</button><h2>${id?'✏️ Editar':'➕ Nuevo'} algoritmo</h2><input id=nm placeholder="Nombre (ej. Búsqueda binaria)" value="${esc(a.n)}"><textarea id=cd placeholder="Pega aquí tu código (Python funciona mejor)">${esc(a.code)}</textarea><button onclick=ex()>💡 Probar con un ejemplo</button> <button class=p onclick="sv(${id})">Guardar</button><p id=er class=mut></p>`}
 function ex(){$('#nm').value='Búsqueda lineal';$('#cd').value=EJ}
 function sv(id){const n=$('#nm').value.trim(),c=$('#cd').value;if(!n||parse(c).length<3)return $('#er').textContent='Pon un nombre y al menos 3 líneas de código.';
  if(id){const a=alg(id);if(a.code!=c)a.st={};a.n=n;a.code=c}else{id=Date.now();S.algs.push({id,n,code:c,st:{}})}save();algo(id)}
 function del(id){if(confirm('¿Borrar este algoritmo?')){S.algs=S.algs.filter(a=>a.id!=id);save();home()}}
 function algo(id){const a=alg(id),L=parse(a.code),I=info(L),n=k=>L.filter(l=>l.k==k).length;
- A.innerHTML=`<button onclick=home()>← Volver</button> <button onclick="form(${id})">✏️</button> <button onclick="del(${id})">🗑️</button><h2>${esc(a.n)}</h2>
+ A.innerHTML=`<button onclick=home()>← Volver</button> <button onclick="frm(${id})">✏️</button> <button onclick="del(${id})">🗑️</button><h2>${esc(a.n)}</h2>
  <div class="card mut"><small>${L.length} líneas · función ${esc(I.name)}</small><br>Entradas: ${esc(I.par.join(', ')||'—')}<br>Variables: ${esc(I.vars.join(', ')||'—')}<br>Estructuras: ${n('loop')} ciclo(s) · ${n('cond')} condición(es) · ${n('ret')} retorno(s)</div>`
  +MODES.map(m=>`<button class=node onclick="start(${id},'${m[0]}')"><span style="font-size:24px">${m[1]}</span><span style="flex:1;text-align:left"><b>${m[2]}</b><br><small class=mut>${m[3]}</small></span><span>${'⭐'.repeat(a.st[m[0]]||0)||'▶️'}</span></button>`).join('')
  +`<button class=node onclick="sim(${id})"><span style="font-size:24px">🧮</span><span style="flex:1;text-align:left"><b>Simulación manual</b><br><small class=mut>Paso 6: tabla de seguimiento</small></span></button>`}
