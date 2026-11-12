@@ -6,7 +6,7 @@ const shuf=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(x=>x[1]);
 const pick1=a=>a[Math.floor(Math.random()*a.length)];
 
 // ---- navegación: los módulos registran sus pantallas en V ----
-const VERSION='1.7.0',V={},CAT=[];
+const VERSION='1.8.0',V={},CAT=[];
 const go=(v,...a)=>{(V[v]||V.pronto)(...a);scrollTo(0,0)};
 const back=(v,a)=>`<button onclick="go('${v||'home'}'${a!=null&&a!==''?`,'${a}'`:''})">← Volver</button>`;
 const big=(ic,t,s,on)=>`<button class=big onclick="${on}"><span class=ic>${ic}</span><span><b>${t}</b><small>${s}</small></span></button>`;
