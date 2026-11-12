@@ -1,6 +1,8 @@
 const PREFIX='algoforja-';
 const APP=['./','index.html','css/styles.css','js/core.js','js/catalog.js','js/learn.js','js/viz.js','js/games.js','js/py.js','js/py-worker.js','manifest.webmanifest','icon-192.png','icon-512.png'];
 let PENDING=null;
+const PYBASE='https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+const PYFILES=['pyodide.js','pyodide.asm.js','pyodide.asm.wasm','python_stdlib.zip','pyodide-lock.json'].map(f=>PYBASE+f);
 const appUrls=()=>APP.map(f=>new URL(f,self.registration.scope).href);
 self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
@@ -14,6 +16,8 @@ self.addEventListener('message',e=>{
     PENDING=PREFIX+String(Date.now()).padStart(15,'0');
     const c=await caches.open(PENDING);
     await Promise.all(appUrls().map(async u=>{const r=await fetch(u,{cache:'reload'});if(!r.ok)throw new Error('No se pudo descargar '+u);await c.put(u,r)}));
+    // Python: se guarda explícitamente, sin depender de que el worker pase por el service worker
+    await Promise.all(PYFILES.map(async u=>{const r=await fetch(u,{cache:'reload'});if(!r.ok)throw new Error('No se pudo descargar Python ('+u+')');await c.put(u,r)}));
    }else if(m.type==='commit'){
     if(!PENDING)throw new Error('No hay una actualización pendiente.');
     const keep=PENDING;PENDING=null;
@@ -21,6 +25,11 @@ self.addEventListener('message',e=>{
    }else if(m.type==='abort'){
     if(PENDING){await caches.delete(PENDING);PENDING=null}
    }
+   if(m.type==='status'){
+    let found=false;
+    for(const n of await caches.keys())if(n.startsWith(PREFIX)&&await(await caches.open(n)).match(PYFILES[0]))found=true;
+    port&&port.postMessage({ok:true,pythonCached:found});
+    return}
    port&&port.postMessage({ok:true});
   }catch(err){
    if(m.type==='update'&&PENDING){await caches.delete(PENDING);PENDING=null}

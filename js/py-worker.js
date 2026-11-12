@@ -1,7 +1,15 @@
 'use strict';
-/* AlgoForja · worker de Python (Pyodide). Es un archivo propio para que el service worker lo controle
-   y guarde Pyodide en la caché: así funciona sin internet después de pulsar "Actualizar aplicación". */
-var PYURL='https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
+/* AlgoForja · worker de Python (Pyodide). La página le pasa los archivos de Pyodide que ya están guardados
+   en el dispositivo; el worker no necesita internet ni depende del service worker para leerlos. */
+var PYBASE='https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+var FILES={};
+var realFetch=self.fetch.bind(self),realImport=self.importScripts.bind(self);
+function pyName(u){return u.indexOf(PYBASE)===0?u.slice(PYBASE.length).split('?')[0]:null}
+self.fetch=function(input,init){const u=typeof input==='string'?input:input.url,n=pyName(u);
+ if(n&&FILES[n]){const f=FILES[n];return Promise.resolve(new Response(f.data,{status:200,headers:{'Content-Type':f.type}}))}
+ return realFetch(input,init)};
+self.importScripts=function(){for(const u of arguments){const n=pyName(u);
+ if(n&&FILES[n])(0,eval)(FILES[n].data);else realImport(u)}};
 var RUNNER_CODE=`import sys, io, json
 class _Stop(Exception):
     pass
@@ -59,18 +67,21 @@ def __run(src, call, maxsteps):
                        "result": None if result is None else __rep(result), "error": err})
 `;
 var py=null,ready=null;
-async function init(){
+function setFiles(files){FILES={};Object.keys(files).forEach(n=>{const d=files[n];FILES[n]={data:d,type:n.endsWith('.js')?'text/javascript':n.endsWith('.wasm')?'application/wasm':n.endsWith('.zip')?'application/zip':'application/json'}})}
+async function init(files){
  if(py)return;
  if(!ready){ready=(async()=>{
-  try{importScripts(PYURL)}catch(e){throw new Error('No se pudo descargar Pyodide. Revisa tu conexión.')}
-  py=await loadPyodide();py.runPython(RUNNER_CODE);
+  setFiles(files);
+  importScripts(PYBASE+'pyodide.js');
+  if(typeof loadPyodide!=='function')throw new Error('Python no se pudo iniciar.');
+  py=await loadPyodide({indexURL:PYBASE});py.runPython(RUNNER_CODE);
  })()}
  try{await ready}catch(e){ready=null;throw e}
 }
 self.onmessage=async function(e){
  const m=e.data;
  try{
-  await init();
+  await init(m.files||{});
   if(m.type==='init'){postMessage({type:'ready'});return}
   postMessage({type:'result',data:String(py.globals.get('__run')(m.src,m.call,m.max))});
  }catch(err){postMessage({type:'fatal',error:String(err&&err.message||err)})}

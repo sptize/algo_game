@@ -3,12 +3,32 @@
    descargar Python nunca se confunde con un ciclo infinito del algoritmo. */
 const LABR={};
 const PY_TIMEOUT={run:8000};
+const PYFILES=['pyodide.js','pyodide.asm.js','pyodide.asm.wasm','python_stdlib.zip','pyodide-lock.json'];
+// lee Python de la caché del dispositivo (sin red). Si falta algo, lo dice.
+async function readPyFiles(){
+ const keys=(await caches.keys()).filter(k=>k.startsWith('algoforja-')).sort().reverse(),out={};
+ for(const n of PYFILES){let hit=null;
+  for(const k of keys){hit=await(await caches.open(k)).match('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'+n,{ignoreSearch:true});if(hit)break}
+  if(!hit)throw new Error('falta '+n);
+  out[n]=(n.endsWith('.js')||n.endsWith('.json'))?await hit.text():await hit.arrayBuffer()}
+ return out}
 let PYW=null,PYCANCEL=null,PYBUSY=false;
 function pyWorker(){if(!PYW)PYW=new Worker('js/py-worker.js');return PYW}
+// si la carga falla, dice si Python está guardado en el dispositivo y qué hacer
+function failPy(err,kill,fail){
+ const msgs=(s)=>{const sw=navigator.serviceWorker&&navigator.serviceWorker.controller;
+  if(!sw){fail('Python no se pudo cargar: esta página todavía no usa la caché del dispositivo. Cierra la app y ábrela de nuevo; después pulsa 🔄 Actualizar aplicación con internet.',kill);return}
+  const ch=new MessageChannel();ch.port1.onmessage=e=>{
+   const cached=e.data&&e.data.pythonCached;
+   fail((cached?'Python sí está guardado, pero el navegador no pudo leerlo ('+err+'). Cierra la app completamente y vuelve a abrirla.':'Python no está guardado en este dispositivo ('+err+'). Pulsa 🔄 Actualizar aplicación con internet.'),kill)};
+  sw.postMessage({type:'status'},[ch.port2])};
+ msgs();
+}
 function pyStop(){if(PYW){try{PYW.terminate()}catch(e){}PYW=null}}
 // status: 'loading' mientras Python está en caché o descargándose; 'running' mientras corre el código
 function pyRun(src,call,onStatus){return new Promise(res=>{
  const w=pyWorker();let tRun=null,done=false;
+ const noGuardado=(err)=>'Python no está guardado en este dispositivo ('+err.message+'). Pulsa 🔄 Actualizar aplicación con internet.';
  const finish=r=>{if(done)return;done=true;clearTimeout(tRun);PYCANCEL=null;res(r)};
  const fail=(msg,kill)=>{if(kill)pyStop();finish({error:msg,steps:[],out:''})};
  PYCANCEL=()=>fail('Cancelado. Vuelve a ejecutar cuando quieras.',true);
@@ -18,16 +38,16 @@ function pyRun(src,call,onStatus){return new Promise(res=>{
    tRun=setTimeout(()=>fail('Se detuvo: el código tardó más de '+(PY_TIMEOUT.run/1000)+' s. Probablemente tiene un ciclo infinito o es demasiado pesado.',true),PY_TIMEOUT.run);
    w.postMessage({type:'run',src,call,max:2000})}
   else if(m.type==='result')finish(JSON.parse(m.data));
-  else if(m.type==='fatal')fail(m.error+' Pulsa 🔄 Actualizar aplicación con internet.',true)};
+  else if(m.type==='fatal')failPy(m.error,true,fail)};
  onStatus&&onStatus('loading');
- w.postMessage({type:'init'});
+ readPyFiles().then(files=>w.postMessage({type:'init',files}),err=>fail(noGuardado(err),true));
 })}
 // descarga Python dentro de la caché nueva (lo usa "Actualizar aplicación")
 function pyWarm(){return new Promise((res,rej)=>{
  const w=new Worker('js/py-worker.js');
  w.onmessage=ev=>{if(ev.data.type==='ready'){w.terminate();res()}else if(ev.data.type==='fatal'){w.terminate();rej(new Error(ev.data.error))}};
- w.onerror=ev=>{w.terminate();rej(new Error('no se pudo descargar Python ('+((ev&&ev.message)||'error')+')'))};
- w.postMessage({type:'init'});
+ w.onerror=ev=>{w.terminate();rej(new Error('Python no se pudo cargar desde el dispositivo ('+((ev&&ev.message)||'error')+')'))};
+ readPyFiles().then(files=>w.postMessage({type:'init',files}),err=>{w.terminate();rej(new Error('Python no quedó guardado ('+err.message+')'))});
 })}
 
 // traduce la traza cruda de Python a pasos para la visualización

@@ -42,21 +42,29 @@ const FE=[
 ['brk','corta el ciclo con break',c=>/^\s*break\b/m.test(c)],
 ['cost','acumula un costo',c=>/cost|g_score|dist/i.test(c)],
 ['vis','recuerda qué ya visitó',c=>/visited|explored|visitado/i.test(c)]];
+
+// Para los juegos de identificar: el código no debe revelar el algoritmo (nombres de funciones e imports)
+const ANON_ID={heuristica:'h',PriorityQueue:'Cola',deque:'Cola'};
+function anon(code){
+ let c=clean(code);
+ const defs=[...new Set([...c.matchAll(/^\s*def\s+(\w+)/gm)].map(m=>m[1]))];
+ defs.forEach((n,i)=>{c=c.replace(new RegExp('\\b'+n+'\\b','g'),'f'+(i+1))});
+ return c.split('\n').filter(l=>!/^\s*(from|import)\s/.test(l)).map(l=>l.replace(/\b(heuristica|PriorityQueue|deque)\b/g,m=>ANON_ID[m])).join('\n')}
 const feats=a=>{const c=clean(a.code),L=parse(c),I=info(L);return FE.filter(f=>f[2](c,L,I))},fk=a=>new Set(feats(a).map(f=>f[0]));
 const pool=()=>S.algs.concat(CAT);
 function idCh(a,P){const same=P.filter(x=>x!=a&&x.cat&&x.cat==a.cat),oth=P.filter(x=>x!=a&&!same.includes(x)),o=shuf([a,...shuf(same).concat(shuf(oth)).slice(0,3)]),fa=feats(a);
- return{t:'quiz',q:'¿Qué algoritmo es este código?',code:clean(a.code),o:o.map(x=>x.n),a:o.indexOf(a),
+ return{t:'quiz',q:'¿Qué algoritmo es este código?',code:anon(a.code),o:o.map(x=>x.n),a:o.indexOf(a),
   w:`Es «${a.n}». Rasgos: ${fa.map(f=>f[1]).slice(0,4).join('; ')||'sin rasgos distintivos'}.`,
   bad:i=>{const kw=fk(o[i]),d=fa.filter(f=>!kw.has(f[0])).map(f=>f[1]).slice(0,2);return`No es «${o[i].n}». `+(d.length?`Este código ${d.join(' y ')}, algo que «${o[i].n}» no hace. `:'Se parecen mucho, pero la lógica de sus líneas los distingue. ')+`Es «${a.n}».`}}}
 function cmpCh(P){const ps=shuf(P);for(const a of ps)for(const b of ps){if(a==b)continue;const ka=fk(a),kb=fk(b),d=FE.filter(f=>ka.has(f[0])!=kb.has(f[0]));if(!d.length)continue;
  const f=pick1(d),aw=ka.has(f[0]),w=aw?a:b,x=aw?b:a;
- return{t:'quiz',q:`¿Cuál de estos dos algoritmos ${f[1]}?`,codes:[{h:'Algoritmo A',c:clean(a.code)},{h:'Algoritmo B',c:clean(b.code)}],o:['A','B'],a:aw?0:1,
+ return{t:'quiz',q:`¿Cuál de estos dos algoritmos ${f[1]}?`,codes:[{h:'Algoritmo A',c:anon(a.code)},{h:'Algoritmo B',c:anon(b.code)}],o:['A','B'],a:aw?0:1,
   w:`${aw?'A':'B'} es «${w.n}» y ${f[1]}; el otro («${x.n}») no.`,bad:i=>`Elegiste ${'AB'[i]}, pero el que ${f[1]} es ${aw?'A':'B'} («${w.n}»). El otro («${x.n}») no.`}}return 0}
-function misCh(a,P){const L=parse(a.code),n=Math.random()<.5?1:2,ok=i=>i+n<=L.length&&L.slice(i,i+n).every(l=>l.k!='def'),st=L.map((_,i)=>i).filter(ok);if(st.length<3)return 0;
+function misCh(a,P){const L=parse(anon(a.code)),n=Math.random()<.5?1:2,ok=i=>i+n<=L.length&&L.slice(i,i+n).every(l=>l.k!='def'),st=L.map((_,i)=>i).filter(ok);if(st.length<3)return 0;
  const i=pick1(st),blk=L.slice(i,i+n),ind=blk[0].t.slice(0,blk[0].t.length-blk[0].s.length),
  norm=b=>{const m=Math.min(...b.map(l=>l.t.length-l.s.length));return b.map(l=>ind+l.t.slice(m)).join('\n')},ans=norm(blk),rows=L.map(l=>l.t);rows.splice(i,n,ind+'________');
  const mine=st.filter(j=>j+n<=i||j>=i+n).map(j=>norm(L.slice(j,j+n))),other=[];
- P.filter(x=>x!=a).forEach(x=>{const M=parse(x.code);for(let j=0;j+n<=M.length;j++)if(M.slice(j,j+n).every(l=>l.k!='def'))other.push(norm(M.slice(j,j+n)))});
+ P.filter(x=>x!=a).forEach(x=>{const M=parse(anon(x.code));for(let j=0;j+n<=M.length;j++)if(M.slice(j,j+n).every(l=>l.k!='def'))other.push(norm(M.slice(j,j+n)))});
  const d=[...new Set(shuf(mine).slice(0,3).concat(shuf(other).slice(0,2)))].filter(x=>x!=ans).slice(0,3);if(!d.length)return 0;
  const o=shuf([ans,...d]),rd=x=>x.split('\n').map(y=>say(y.trim())).join(' → ');
  return{t:'quiz',m:1,q:'Falta una parte del código. ¿Cuál es?',code:rows.join('\n'),o,a:o.indexOf(ans),w:`Faltaba: «${rd(ans)}».`,bad:j=>`Elegiste «${rd(o[j])}». Aquí faltaba «${rd(ans)}», que es lo que encaja en ese punto del algoritmo.`}}
