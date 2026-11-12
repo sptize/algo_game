@@ -39,7 +39,7 @@ function userLesson(a){
   problema:K?K.o:`La función ${I.name} recibe ${I.par.join(', ')||'nada'} y devuelve ${rets}. Piensa qué problema resuelve.`,
   fundamento:K?K.e:'No reconocí un patrón clásico; el fundamento se deduce de la estructura del código.',
   funcionamiento:L.map(l=>say(l.s)),
-  ejemplo:{texto:'La app no ejecuta tu código. Prueba una entrada pequeña en la Simulación manual y compara con la explicación.',sim:true},
+  ejemplo:{texto:'Ejecútalo en el Laboratorio Python con una entrada pequeña: verás cada línea y el valor de las variables.',sim:true},
   limitaciones:(K?K.r:[]).concat(['Revisa casos borde: entrada vacía, un solo elemento y valores repetidos.','Confirma que el algoritmo termina (los ciclos o la recursión avanzan).']),
   tiempo,espacio,
   rendimiento:K?K.t:'Usa la complejidad estimada como guía y compárala con un algoritmo clásico parecido del catálogo.'}}
@@ -49,7 +49,7 @@ function fichaHTML(a){
  const le=CAT.includes(a)?a.L:userLesson(a),id=a.id,ej=le.ejemplo||{};
  const ul=xs=>`<ul>${xs.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`,ol=xs=>`<ol>${xs.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`;
  const tab=ej.tabla?'<div style="overflow-x:auto"><table>'+ej.tabla.map((r,i)=>'<tr>'+r.map(c=>`<${i?'td':'th'}>${esc(c)}</${i?'td':'th'}>`).join('')+'</tr>').join('')+'</table></div>':'';
- const tr=typeof TRACE!='undefined'&&TRACE[id];
+ const tr=(typeof TRACE!='undefined'&&TRACE[id])||(typeof LABR!='undefined'&&LABR[id]&&LABR[id].steps.length);
  const sec=(h,b)=>`<div class=card><h3>${h}</h3>${b}</div>`;
  return `<button onclick="go('algo','${id}')">← Volver</button><h2>📖 ${esc(a.n)}</h2>`
  +(CAT.includes(a)?'':'<p class=mut>Análisis automático de tu código: lo que aparece es una estimación.</p>')
@@ -59,7 +59,7 @@ function fichaHTML(a){
  +sec('🎯 4. Problema que resuelve',`<p>${esc(le.problema)}</p>`)
  +sec('🧱 5. Fundamento teórico',`<p>${esc(le.fundamento)}</p>`)
  +sec('⚙️ 6. Funcionamiento',ol(le.funcionamiento))
- +sec('🧪 7. Ejemplo de ejecución',`<p>${esc(ej.texto||'')}</p>${tab}`+(tr?`<button class=p onclick="go('viz','${id}')">▶️ Ejecución paso a paso</button>`:'')+(ej.sim?`<button onclick="go('sim','${id}')">🧮 Simulación manual</button>`:''))
+ +sec('🧪 7. Ejemplo de ejecución',`<p>${esc(ej.texto||'')}</p>${tab}`+(tr?`<button class=p onclick="go('viz','${id}')">▶️ Ejecución paso a paso</button>`:'')+(ej.sim?`<button onclick="go('sim','${id}')">🧮 Simulación manual</button> <button onclick="go('lab','${id}')">🐍 Laboratorio Python</button>`:''))
  +sec('⚠️ 8. Limitaciones',ul(le.limitaciones))
  +sec('📈 9. Complejidad y rendimiento',`<p>${esc(le.rendimiento)}</p>`)
  +sec('🎮 10. Juego de análisis de implementación',`<p class=mut>Practica identificando y reconstruyendo esta implementación.</p><button class=p onclick="go('jugar','${id}')">🎮 Jugar</button>`)

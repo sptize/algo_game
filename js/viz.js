@@ -214,12 +214,12 @@ const TRACE={
  voraz:{entrada:'mismo grafo · h: A = 4, B = 3, C = 1, D = 0',nodos:NODOS,colaNom:'Cola de prioridad',gen:function*(){yield* priori('voraz')}}
 };
 
-V.viz=id=>{const a=alg(id),T0=TRACE[id];
+V.viz=id=>{const a=alg(id),T0=TRACE[id]||labTrace(id);
  if(!a)return go('catalogo');
- if(!T0){A.innerHTML=back('ficha',id)+'<h2>▶️ Ejecución</h2><div class=card><p class=mut>Este algoritmo todavía no tiene animación. Revisa su ficha: tiene la explicación y una tabla de ejemplo.</p></div>';return}
+ if(!T0){A.innerHTML=back('ficha',id)+'<h2>▶️ Ejecución</h2><div class=card><p class=mut>Este algoritmo no tiene animación fija. Ejecútalo en el Laboratorio Python para ver su traza real.</p></div>';return}
  VZ={id,T:T0,steps:[...T0.gen()],i:0};vzDraw()};
 function vzDraw(){const s=VZ.steps[VZ.i],a=alg(VZ.id),lines=clean(a.code).split('\n');
- const hit=s.hl?lines.findIndex(l=>l.trim().startsWith(s.hl)):-1;
+ const hit=s.ln!=null?s.ln-1:(s.hl?lines.findIndex(l=>l.trim().startsWith(s.hl)):-1);
  const arr=s.arr||VZ.T.arr;
  const cells=arr?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">'+arr.map((x,i)=>{const hi=(s.hi||[]).includes(i),rg=s.rng&&i>=s.rng[0]&&i<=s.rng[1];
   return `<div style="text-align:center"><div style="min-width:44px;padding:10px 6px;border-radius:10px;font-weight:700;background:${hi?'#1e6fe8':rg?'#d6e6ff':'#fff'};color:${hi?'#fff':'#0f2a4a'};border:1px solid #d5e3f7">${x}</div><small class=mut>${i}</small></div>`}).join('')+'</div>':'';

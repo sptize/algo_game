@@ -6,7 +6,7 @@ const shuf=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(x=>x[1]);
 const pick1=a=>a[Math.floor(Math.random()*a.length)];
 
 // ---- navegación: los módulos registran sus pantallas en V ----
-const VERSION='1.5.0',V={},CAT=[];
+const VERSION='1.6.0',V={},CAT=[];
 const go=(v,...a)=>{(V[v]||V.pronto)(...a);scrollTo(0,0)};
 const back=(v,a)=>`<button onclick="go('${v||'home'}'${a!=null&&a!==''?`,'${a}'`:''})">← Volver</button>`;
 const big=(ic,t,s,on)=>`<button class=big onclick="${on}"><span class=ic>${ic}</span><span><b>${t}</b><small>${s}</small></span></button>`;
@@ -77,14 +77,15 @@ V.catalogo=m=>{const row=a=>`<button class="card node" onclick="go('algo','${a.i
  +(CAT.map(row).join('')||'<p class=mut>Los algoritmos clásicos llegan en una próxima entrega.</p>')};
 V.algo=id=>{const a=alg(id),L=parse(a.code),I=info(L),mine=S.algs.includes(a);
  A.innerHTML=back('catalogo')+(mine?` <button onclick="go('nuevo','${id}')">✏️</button> <button onclick="del('${id}')">🗑️</button>`:'')+`<h2>${esc(a.n)}</h2><div class="card mut"><small>${L.length} líneas · función ${esc(I.name)}${a.cat?' · '+esc(a.cat):''}</small></div>`
- +big('📖','Aprender','Ficha de estudio completa',`go('ficha','${id}')`)+big('🎮','Jugar con este algoritmo','Los modos de práctica',`go('jugar','${id}')`)};
+ +big('📖','Aprender','Ficha de estudio completa',`go('ficha','${id}')`)+big('🎮','Jugar con este algoritmo','Los modos de práctica',`go('jugar','${id}')`)
+ +big('🐍','Laboratorio Python','Ejecuta el código real y mira su traza',`go('lab','${id}')`)};
 const EJ=`def buscar(lista, buscado):\n    posicion = -1  # empieza sin encontrar\n    for i in range(len(lista)):\n        if lista[i] == buscado:\n            posicion = i\n            break\n    return posicion`;
 V.nuevo=id=>{const a=id?alg(id):{n:'',cat:'',code:''};
- A.innerHTML=back(id?'algo':'aprende',id)+`<h2>${id?'✏️ Editar':'➕ Nuevo'} algoritmo</h2><input id=nm placeholder="Nombre (ej. Búsqueda binaria)" value="${esc(a.n)}"><input id=ct placeholder="Categoría (ej. Búsqueda, Ordenamiento)" value="${esc(a.cat||'')}"><textarea id=cd placeholder="Pega aquí tu código (Python funciona mejor). Los comentarios se omiten automáticamente.">${esc(a.code)}</textarea><button onclick=ex()>💡 Ejemplo</button> <button class=p onclick="sv('${id||''}')">Guardar</button><p id=er class=mut></p>`};
-function ex(){$('#nm').value='Búsqueda lineal';$('#ct').value='Búsqueda';$('#cd').value=EJ}
-function sv(id){const n=$('#nm').value.trim(),ct=$('#ct').value.trim(),c=clean($('#cd').value);
+ A.innerHTML=back(id?'algo':'aprende',id)+`<h2>${id?'✏️ Editar':'➕ Nuevo'} algoritmo</h2><input id=nm placeholder="Nombre (ej. Búsqueda binaria)" value="${esc(a.n)}"><input id=ct placeholder="Categoría (ej. Búsqueda, Ordenamiento)" value="${esc(a.cat||'')}"><input id=ll placeholder="Llamada para ejecutar, ej. buscar([4, 8, 12, 16], 12)" value="${esc(a.call||'')}"><textarea id=cd placeholder="Pega aquí tu código (Python funciona mejor). Los comentarios se omiten automáticamente.">${esc(a.code)}</textarea><button onclick=ex()>💡 Ejemplo</button> <button class=p onclick="sv('${id||''}')">Guardar</button><p id=er class=mut></p>`};
+function ex(){$('#nm').value='Búsqueda lineal';$('#ct').value='Búsqueda';$('#cd').value=EJ;$('#ll').value='buscar([4, 8, 12, 16], 12)'}
+function sv(id){const n=$('#nm').value.trim(),ct=$('#ct').value.trim(),c=clean($('#cd').value),call=$('#ll').value.trim();
  if(!n||parse(c).length<3)return $('#er').textContent='Pon un nombre y al menos 3 líneas de código.';
- if(id){const a=alg(id);if(a.code!=c)a.st={};Object.assign(a,{n,cat:ct,code:c})}else{id=String(Date.now());S.algs.push({id,n,cat:ct,code:c,st:{}})}
+ if(id){const a=alg(id);if(a.code!=c)a.st={};Object.assign(a,{n,cat:ct,code:c,call})}else{id=String(Date.now());S.algs.push({id,n,cat:ct,code:c,call,st:{}})}
  save();go('algo',id)}
 function del(id){if(confirm('¿Borrar este algoritmo?')){S.algs=S.algs.filter(a=>a.id!=id);save();go('catalogo')}}
 
