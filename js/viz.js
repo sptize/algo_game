@@ -117,6 +117,51 @@ function* dijk(){
  }
  yield {hl:'return costo.get',d:`Costo mínimo de A a D: ${costo.D}.`,cola:[],nodes:est('D'),info:inf()}}
 
+
+const MULB=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+function* hillSim(){
+ const N=16,f=x=>-((x-7)**2)+10,arr=[...Array(N).keys()].map(f);
+ let x=2;
+ yield {hl:'actual = inicial',d:`Empiezo en x = ${x}, con valor ${f(x)}.`,arr,hi:[x],v:{x,valor:f(x)}};
+ for(let it=1;;it++){
+  yield {hl:'for _ in',d:`Iteración ${it}: miro los vecinos de x = ${x}.`,arr,hi:[x],v:{x,valor:f(x)}};
+  const vs=[x-1,x+1].filter(v=>v>=0&&v<N);
+  const mejor=vs.length?vs.reduce((b,v)=>f(v)>f(b)?v:b,vs[0]):x;
+  yield {hl:'mejor = max',d:`Vecinos: ${vs.map(v=>`${v} (${f(v)})`).join(', ')}. El mejor es ${mejor}.`,arr,hi:vs,v:{x,mejor,valor:f(mejor)}};
+  if(f(mejor)<=f(x)){
+   yield {hl:'if valor(mejor)',d:`${f(mejor)} no supera a ${f(x)}: me detengo.`,arr,hi:[x],v:{x,valor:f(x)}};
+   yield {hl:'return actual',d:`Ningún vecino mejora: x = ${x} es el mejor punto local.`,arr,hi:[x],v:{resultado:x}};
+   return x}
+  x=mejor;
+  yield {hl:'actual = mejor',d:`Me muevo a x = ${x}, con valor ${f(x)}.`,arr,hi:[x],v:{x,valor:f(x)}};
+ }}
+function* gaSim(){
+ const rnd=MULB(42),G=3,ap=s=>[...s].filter(c=>c=='1').length;
+ let pop=['100001','011110','111000','000111'];
+ const pick=apts=>{const tot=apts.reduce((a,b)=>a+b,0);let r=rnd()*tot,acc=0;for(let i=0;i<apts.length;i++){acc+=apts[i];if(acc>=r)return i}return apts.length-1};
+ for(let g=1;g<=G;g++){
+  yield {hl:'for _ in',d:`Generación ${g}: estos son los individuos.`,arr:pop.slice(),v:{generacion:g,mejor:Math.max(...pop.map(ap))}};
+  const apts=pop.map(ap);
+  yield {hl:'aptitudes = ',d:`Aptitudes (número de unos): ${pop.map((p,i)=>p+' → '+apts[i]).join(', ')}.`,arr:pop.slice(),v:{generacion:g}};
+  const nueva=[];
+  yield {hl:'nueva = []',d:'Creo la nueva generación.',arr:pop.slice()};
+  while(nueva.length<pop.length){
+   const i1=pick(apts),i2=pick(apts);
+   yield {hl:'p1 = seleccion',d:`Padre 1 elegido por ruleta: ${pop[i1]} (aptitud ${apts[i1]}).`,arr:pop.slice(),hi:[i1]};
+   yield {hl:'p2 = seleccion',d:`Padre 2: ${pop[i2]} (aptitud ${apts[i2]}).`,arr:pop.slice(),hi:[i1,i2]};
+   const p=1+Math.floor(rnd()*5),hijo=pop[i1].slice(0,p)+pop[i2].slice(p);
+   yield {hl:'nueva.append',d:`Cruce en el punto ${p}: ${pop[i1].slice(0,p)}|${pop[i1].slice(p)} + ${pop[i2].slice(0,p)}|${pop[i2].slice(p)} → ${hijo}.`,arr:pop.slice(),hi:[i1,i2]};
+   const mut=hijo.split('').map(c=>(rnd()<0.1?(c=='1'?'0':'1'):c)).join('');
+   nueva.push(mut);
+   yield {hl:'nueva.append',d:mut!==hijo?`Mutación: ${hijo} → ${mut}.`:`Sin mutación: el hijo queda ${mut}.`,arr:nueva.concat(pop.slice(nueva.length)),hi:[nueva.length-1]};
+  }
+  pop=nueva;
+  yield {hl:'poblacion = nueva',d:`Nueva generación: ${pop.join(', ')}.`,arr:pop.slice()};
+ }
+ const best=pop.reduce((b,x)=>ap(x)>ap(b)?x:b,pop[0]);
+ yield {hl:'return max',d:`Mejor individuo: ${best}, con aptitud ${ap(best)}.`,arr:pop.slice(),hi:[pop.indexOf(best)]};
+}
+
 const TRACE={
  lineal:{entrada:'lista = [4, 8, 12, 16], buscado = 12',arr:[4,8,12,16],gen:function*(){
   const lista=[4,8,12,16],x=12;
@@ -211,10 +256,12 @@ const TRACE={
  dfs:{entrada:'mismo grafo · inicio A · meta D',nodos:NODOS,colaNom:'Pila',gen:function*(){yield* recorrido('dfs')}},
  dijkstra:{entrada:'A→B (1), A→C (4), B→C (2), C→D (1) · de A a D',nodos:NODOS,colaNom:'Cola de prioridad',gen:function*(){yield* dijk()}},
  astar:{entrada:'mismo grafo de Dijkstra · h: A = 4, B = 3, C = 1, D = 0',nodos:NODOS,colaNom:'Cola de prioridad',gen:function*(){yield* priori('astar')}},
- voraz:{entrada:'mismo grafo · h: A = 4, B = 3, C = 1, D = 0',nodos:NODOS,colaNom:'Cola de prioridad',gen:function*(){yield* priori('voraz')}}
+ voraz:{entrada:'mismo grafo · h: A = 4, B = 3, C = 1, D = 0',nodos:NODOS,colaNom:'Cola de prioridad',gen:function*(){yield* priori('voraz')}},
+ hill:{entrada:'inicio x = 2 · f(x) = −(x − 7)² + 10 · x entre 0 y 15',arr:[...Array(16).keys()].map(x=>-((x-7)**2)+10),gen:function*(){yield* hillSim()}},
+ genetico:{entrada:'4 cadenas de 6 bits · 3 generaciones · semilla fija',arr:['100001','011110','111000','000111'],gen:function*(){yield* gaSim()}}
 };
 
-V.viz=id=>{const a=alg(id),T0=TRACE[id]||labTrace(id);
+V.viz=id=>{const a=alg(id),T0=(a&&!a.edited&&TRACE[id])||labTrace(id);
  if(!a)return go('catalogo');
  if(!T0){A.innerHTML=back('ficha',id)+'<h2>▶️ Ejecución</h2><div class=card><p class=mut>Este algoritmo no tiene animación fija. Ejecútalo en el Laboratorio Python para ver su traza real.</p></div>';return}
  VZ={id,T:T0,steps:[...T0.gen()],i:0};vzDraw()};

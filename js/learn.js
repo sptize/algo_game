@@ -46,13 +46,13 @@ function userLesson(a){
 
 // ---- ficha de estudio: los 10 puntos, en el orden pedido ----
 function fichaHTML(a){
- const le=CAT.includes(a)?a.L:userLesson(a),id=a.id,ej=le.ejemplo||{};
+ const le=a.L||userLesson(a),id=a.id,ej=le.ejemplo||{};
  const ul=xs=>`<ul>${xs.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`,ol=xs=>`<ol>${xs.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`;
  const tab=ej.tabla?'<div style="overflow-x:auto"><table>'+ej.tabla.map((r,i)=>'<tr>'+r.map(c=>`<${i?'td':'th'}>${esc(c)}</${i?'td':'th'}>`).join('')+'</tr>').join('')+'</table></div>':'';
  const tr=(typeof TRACE!='undefined'&&TRACE[id])||(typeof LABR!='undefined'&&LABR[id]&&LABR[id].steps.length);
  const sec=(h,b)=>`<div class=card><h3>${h}</h3>${b}</div>`;
  return `<button onclick="go('algo','${id}')">← Volver</button><h2>📖 ${esc(a.n)}</h2>`
- +(CAT.includes(a)?'':'<p class=mut>Análisis automático de tu código: lo que aparece es una estimación.</p>')
+ +(a.L?(a.edited?'<p class=mut>Modificaste el código: la ficha describe el algoritmo original.</p>':''):'<p class=mut>Análisis automático de tu código: lo que aparece es una estimación.</p>')
  +sec('⏱️ 1. Complejidad en tiempo y espacio',`<p><b>Tiempo:</b> ${esc(le.tiempo)}</p><p><b>Espacio:</b> ${esc(le.espacio)}</p>`)
  +sec('📚 2. Pila de llamadas',`<p>${esc(le.pila)}</p>`+(tr?`<button onclick="go('viz','${id}')">▶️ Ver la pila paso a paso</button>`:''))
  +sec('🔗 3. Relación entre componentes',ul(le.relaciones))

@@ -320,4 +320,65 @@ tiempo:'O(bᵈ): b jugadas por turno y profundidad d.',espacio:'O(d): la pila ll
 rendimiento:'Perfecta dentro de la profundidad explorada. La poda alfa-beta da el mismo resultado explorando menos nodos.',
 pila:'Recursiva: cada turno abre una llamada; la pila llega a la profundidad d y se cierra al devolver los valores.',
 relaciones:['profundidad → cuánto mira hacia adelante.','max / min → alternan entre los dos jugadores.','hijos → jugadas posibles.','valor de las hojas → lo que sube hasta la raíz.']}}
+,
+{id:'hill',n:'Escalada de colinas (Hill climbing)',cat:'Búsqueda local',call:"hill_climbing(2, lambda x: -(x - 7) ** 2 + 10, lambda x: [v for v in (x - 1, x + 1) if 0 <= v <= 15])",code:`def hill_climbing(inicial, valor, vecinos, max_iter=100):
+    actual = inicial
+    for _ in range(max_iter):
+        mejor = max(vecinos(actual), key=valor, default=actual)
+        if valor(mejor) <= valor(actual):
+            return actual
+        actual = mejor
+    return actual`,
+L:{problema:'Encontrar una solución con el valor más alto cuando revisar todas las posibilidades es imposible o muy costoso.',
+fundamento:'Búsqueda local: parte de una solución, mira sus vecinos y se mueve al mejor siempre que mejore. Se detiene cuando ningún vecino supera a la solución actual.',
+funcionamiento:['Empiezo en una solución inicial.','Genero los vecinos de la solución actual.','Elijo el vecino con mayor valor.','Si no mejora la solución actual, me detengo y devuelvo la actual.','Si mejora, me muevo a ese vecino y repito.'],
+ejemplo:{texto:'f(x) = −(x − 7)² + 10, con x entre 0 y 15, empezando en x = 2. Vecinos: x − 1 y x + 1.',tabla:[['x','f(x)','vecinos (valor)','mejor vecino'],['2','−15','1 (−26), 3 (−6)','3'],['3','−6','2 (−15), 4 (1)','4'],['4','1','3 (−6), 5 (6)','5'],['5','6','4 (1), 6 (9)','6'],['6','9','5 (6), 7 (10)','7'],['7','10','6 (9), 8 (9)','ninguno mejora: se detiene en 7']]},
+limitaciones:['Puede quedarse en un máximo local que no es el mejor global.','El resultado depende mucho del punto de partida.','Necesita una forma sencilla de generar los vecinos.'],
+tiempo:'Depende de cuántos pasos da: cada paso evalúa todos sus vecinos.',espacio:'O(1): solo guarda la solución actual.',
+rendimiento:'Muy rápida y fácil de implementar. Mejora con reinicios aleatorios o con recocido simulado, que a veces acepta un paso malo para escapar de un máximo local.',
+pila:'No recursivo.',
+relaciones:['actual → la solución en la que estoy.','vecinos → candidatos cercanos.','valor → criterio para comparar.','max(...) → elige el mejor vecino.','if → decide si seguir o parar.']}},
+{id:'genetico',n:'Algoritmo genético',cat:'Evolutivos',call:'algoritmo_genetico([[1, 0, 0, 0, 0, 1], [0, 1, 1, 1, 1, 0], [1, 1, 1, 0, 0, 0], [0, 0, 0, 1, 1, 1]], 3)',code:`import random
+
+def algoritmo_genetico(poblacion, generaciones):
+    for _ in range(generaciones):
+        aptitudes = [aptitud(ind) for ind in poblacion]
+        nueva = []
+        while len(nueva) < len(poblacion):
+            p1 = seleccion_ruleta(poblacion, aptitudes)
+            p2 = seleccion_ruleta(poblacion, aptitudes)
+            nueva.append(mutacion(cruce(p1, p2)))
+        poblacion = nueva
+    return max(poblacion, key=aptitud)
+
+def aptitud(individuo):
+    return sum(individuo)
+
+def seleccion_ruleta(poblacion, aptitudes):
+    total = sum(aptitudes)
+    if total == 0:
+        return random.choice(poblacion)
+    r = random.uniform(0, total)
+    acumulado = 0
+    for ind, apt in zip(poblacion, aptitudes):
+        acumulado += apt
+        if acumulado >= r:
+            return ind
+    return poblacion[-1]
+
+def cruce(p1, p2):
+    punto = random.randint(1, len(p1) - 1)
+    return p1[:punto] + p2[punto:]
+
+def mutacion(ind, prob=0.05):
+    return [1 - g if random.random() < prob else g for g in ind]`,
+L:{problema:'Buscar una buena solución cuando hay demasiadas posibilidades para revisarlas todas.',
+fundamento:'Imita la evolución: los individuos más aptos tienen más probabilidad de reproducirse, el cruce combina sus partes y la mutación introduce variedad para no quedarse atascado.',
+funcionamiento:['Empiezo con una población inicial.','Calculo la aptitud de cada individuo.','Elijo dos padres por ruleta, con probabilidad proporcional a su aptitud.','Cruzo los padres en un punto y muto el hijo con baja probabilidad.','Repito hasta llenar la nueva generación y repito por varias generaciones.','Devuelvo el mejor individuo.'],
+ejemplo:{texto:'Población de 4 cadenas de 6 bits. La aptitud cuenta cuántos unos tiene cada una.',tabla:[['individuo','aptitud'],['100001','2'],['011110','4'],['111000','3'],['000111','3']]},
+limitaciones:['No garantiza encontrar el óptimo.','Muy sensible a sus parámetros: tamaño de población, probabilidad de mutación y número de generaciones.','Si la aptitud está mal diseñada, evoluciona hacia lo equivocado.','Puede converger demasiado pronto y perder variedad.'],
+tiempo:'O(G · P · n) si calcular la aptitud cuesta O(n): G generaciones, P individuos y n genes por individuo.',espacio:'O(P · n).',
+rendimiento:'Muy útil cuando no hay una fórmula directa y el espacio de soluciones es enorme. Los resultados cambian entre corridas; con semilla fija se pueden reproducir.',
+pila:'No recursivo.',
+relaciones:['población → conjunto de soluciones candidatas.','aptitud → mide qué tan buena es cada una.','selección → decide quién se reproduce.','cruce → combina dos soluciones.','mutación → introduce cambios pequeños para explorar.','generaciones → repiten el ciclo y mejoran la población.']}}
 );

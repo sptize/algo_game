@@ -6,7 +6,7 @@ const shuf=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(x=>x[1]);
 const pick1=a=>a[Math.floor(Math.random()*a.length)];
 
 // ---- navegación: los módulos registran sus pantallas en V ----
-const VERSION='1.6.0',V={},CAT=[];
+const VERSION='1.7.0',V={},CAT=[];
 const go=(v,...a)=>{(V[v]||V.pronto)(...a);scrollTo(0,0)};
 const back=(v,a)=>`<button onclick="go('${v||'home'}'${a!=null&&a!==''?`,'${a}'`:''})">← Volver</button>`;
 const big=(ic,t,s,on)=>`<button class=big onclick="${on}"><span class=ic>${ic}</span><span><b>${t}</b><small>${s}</small></span></button>`;
@@ -55,7 +55,7 @@ let S={xp:0,streak:0,last:'',algs:[],prog:{}};
 const db=new Promise(r=>{try{const q=indexedDB.open('algoforja',1);q.onupgradeneeded=()=>q.result.createObjectStore('k');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)}catch(e){r(null)}});
 const load=async()=>{const d=await db;return d?new Promise(r=>{const g=d.transaction('k').objectStore('k').get('s');g.onsuccess=()=>r(g.result);g.onerror=()=>r()}):0};
 const save=async()=>{const d=await db;if(d)d.transaction('k','readwrite').objectStore('k').put(S,'s')};
-const alg=id=>S.algs.find(a=>a.id==id)||CAT.find(a=>a.id==id);
+const alg=id=>{const u=S.algs.find(a=>a.id==id);if(u)return u;const c=CAT.find(a=>a.id==id);return c&&S.cedit&&S.cedit[id]?Object.assign({},c,{code:S.cedit[id],edited:true}):c};
 const stOf=a=>a.st||(S.prog[a.id]=S.prog[a.id]||{});
 const stars=a=>MODES.reduce((s,m)=>s+(stOf(a)[m[0]]||0),0);
 function award(a,mode,st){const s=stOf(a),pv=s[mode]||0;if(st>pv){S.xp+=10*(st-pv);s[mode]=st}
@@ -78,7 +78,8 @@ V.catalogo=m=>{const row=a=>`<button class="card node" onclick="go('algo','${a.i
 V.algo=id=>{const a=alg(id),L=parse(a.code),I=info(L),mine=S.algs.includes(a);
  A.innerHTML=back('catalogo')+(mine?` <button onclick="go('nuevo','${id}')">✏️</button> <button onclick="del('${id}')">🗑️</button>`:'')+`<h2>${esc(a.n)}</h2><div class="card mut"><small>${L.length} líneas · función ${esc(I.name)}${a.cat?' · '+esc(a.cat):''}</small></div>`
  +big('📖','Aprender','Ficha de estudio completa',`go('ficha','${id}')`)+big('🎮','Jugar con este algoritmo','Los modos de práctica',`go('jugar','${id}')`)
- +big('🐍','Laboratorio Python','Ejecuta el código real y mira su traza',`go('lab','${id}')`)};
+ +big('🐍','Laboratorio Python','Ejecuta el código real y mira su traza',`go('lab','${id}')`)
+ +(mine?'':big('✏️','Modificar código','Pega una versión nueva de este algoritmo',`go('editcat','${id}')`)+(a.edited?big('↩️','Restaurar original','Vuelve al código del catálogo',`restaurar('${id}')`):''))};
 const EJ=`def buscar(lista, buscado):\n    posicion = -1  # empieza sin encontrar\n    for i in range(len(lista)):\n        if lista[i] == buscado:\n            posicion = i\n            break\n    return posicion`;
 V.nuevo=id=>{const a=id?alg(id):{n:'',cat:'',code:''};
  A.innerHTML=back(id?'algo':'aprende',id)+`<h2>${id?'✏️ Editar':'➕ Nuevo'} algoritmo</h2><input id=nm placeholder="Nombre (ej. Búsqueda binaria)" value="${esc(a.n)}"><input id=ct placeholder="Categoría (ej. Búsqueda, Ordenamiento)" value="${esc(a.cat||'')}"><input id=ll placeholder="Llamada para ejecutar, ej. buscar([4, 8, 12, 16], 12)" value="${esc(a.call||'')}"><textarea id=cd placeholder="Pega aquí tu código (Python funciona mejor). Los comentarios se omiten automáticamente.">${esc(a.code)}</textarea><button onclick=ex()>💡 Ejemplo</button> <button class=p onclick="sv('${id||''}')">Guardar</button><p id=er class=mut></p>`};
@@ -95,6 +96,11 @@ async function actualizar(){
  try{const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()));
   const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}catch(e){}
  location.replace(location.pathname+'?u='+Date.now())}
+
+V.editcat=id=>{const a=alg(id);if(!a||!a.L)return go('catalogo');
+ A.innerHTML=back('algo',id)+`<h2>✏️ Modificar código</h2><p class=mut>Pega la versión del algoritmo que te den. Los comentarios se omiten. Si la cambias, la animación fija se reemplaza por la traza real del laboratorio.</p><textarea id=cd>${esc(a.code)}</textarea><button class=p onclick="guardarCat('${id}')">Guardar cambios</button>`};
+function guardarCat(id){const c=clean($('#cd').value);if(parse(c).length<3)return alert('El código necesita al menos 3 líneas.');S.cedit=S.cedit||{};S.cedit[id]=c;save();go('algo',id)}
+function restaurar(id){if(S.cedit)delete S.cedit[id];save();go('algo',id)}
 
 // ---- arranque ----
 addEventListener('load',()=>{
