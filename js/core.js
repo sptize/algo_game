@@ -6,7 +6,7 @@ const shuf=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(x=>x[1]);
 const pick1=a=>a[Math.floor(Math.random()*a.length)];
 
 // ---- navegación: los módulos registran sus pantallas en V ----
-const VERSION='1.8.0',V={},CAT=[];
+const VERSION='1.9.0',V={},CAT=[];
 const go=(v,...a)=>{(V[v]||V.pronto)(...a);scrollTo(0,0)};
 const back=(v,a)=>`<button onclick="go('${v||'home'}'${a!=null&&a!==''?`,'${a}'`:''})">← Volver</button>`;
 const big=(ic,t,s,on)=>`<button class=big onclick="${on}"><span class=ic>${ic}</span><span><b>${t}</b><small>${s}</small></span></button>`;
@@ -91,16 +91,21 @@ function sv(id){const n=$('#nm').value.trim(),ct=$('#ct').value.trim(),c=clean($
 function del(id){if(confirm('¿Borrar este algoritmo?')){S.algs=S.algs.filter(a=>a.id!=id);save();go('catalogo')}}
 
 // ---- actualizar: borra la copia guardada de la app (no toca tus datos) y recarga ----
+// ---- actualizar: solo aquí se usa internet. Descarga la app y Python en una caché nueva; si algo falla, sigue la versión anterior ----
+function swMsg(sw,msg){return new Promise((res,rej)=>{const ch=new MessageChannel();ch.port1.onmessage=e=>e.data&&e.data.error?rej(new Error(e.data.error)):res(e.data);sw.postMessage(msg,[ch.port2])})}
 async function actualizar(){
- if(!confirm('¿Actualizar la aplicación? Tu progreso y tus algoritmos se conservan.'))return;
- try{const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()));
-  const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}catch(e){}
- location.replace(location.pathname+'?u='+Date.now())}
-
-V.editcat=id=>{const a=alg(id);if(!a||!a.L)return go('catalogo');
- A.innerHTML=back('algo',id)+`<h2>✏️ Modificar código</h2><p class=mut>Pega la versión del algoritmo que te den. Los comentarios se omiten. Si la cambias, la animación fija se reemplaza por la traza real del laboratorio.</p><textarea id=cd>${esc(a.code)}</textarea><button class=p onclick="guardarCat('${id}')">Guardar cambios</button>`};
-function guardarCat(id){const c=clean($('#cd').value);if(parse(c).length<3)return alert('El código necesita al menos 3 líneas.');S.cedit=S.cedit||{};S.cedit[id]=c;save();go('algo',id)}
-function restaurar(id){if(S.cedit)delete S.cedit[id];save();go('algo',id)}
+ if(!confirm('Descargar la última versión de la app y Python. Necesita internet. ¿Continuar?'))return;
+ A.innerHTML=`<div class=card><h3>🔄 Actualizando…</h3><p class=mut>Descargando la app y Python. No cierres la aplicación.</p></div>`;
+ let sw=null;
+ try{
+  sw=(await navigator.serviceWorker.ready).active;
+  await swMsg(sw,{type:'update'});
+  await pyWarm();
+  await swMsg(sw,{type:'commit'});
+  location.reload();
+ }catch(err){
+  try{if(sw)await swMsg(sw,{type:'abort'})}catch(e){}
+  A.innerHTML=back()+`<div class=card><h3>No se pudo actualizar</h3><p class=mut>${esc(err.message)}</p><p>La versión que ya tienes sigue funcionando. Revisa tu conexión e inténtalo de nuevo.</p></div>`}}
 
 // ---- arranque ----
 addEventListener('load',()=>{
